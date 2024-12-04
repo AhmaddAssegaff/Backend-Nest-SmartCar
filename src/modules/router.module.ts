@@ -1,15 +1,9 @@
-import { DynamicModule, ForwardReference, Module, Type } from '@nestjs/common';
+import { DynamicModule, ForwardReference, Type } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { UserSessionModule } from './user-session/user-session.module';
 import { EspGateway } from './webSoket/esp-gateway.gateway';
 
-@Module({
-  imports: [],
-  exports: [],
-  providers: [],
-})
-// AdminModule, AuthModule, UserSessionModule,
 export class RouterModule {
   static forRoot(): DynamicModule {
     const imports: (DynamicModule | Type<any> | Promise<DynamicModule> | ForwardReference<any>)[] =

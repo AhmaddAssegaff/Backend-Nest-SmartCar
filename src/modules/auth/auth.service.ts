@@ -22,12 +22,41 @@ export class AuthService {
     throw new UnauthorizedException('Invalid credentials');
   }
 
-  async loginAndSetCookie(loginDto: LoginDto) {
+  async loginAndSetCookie(loginDto: LoginDto, res: ExpressResponse) {
     const user = await this.validateUser(loginDto.name, loginDto.password);
     const payload = { username: user.name, role: user.role, id: user.id };
-    const access_token = await this.jwtService.signAsync(payload);
 
-    return { access_token, user };
+    const access_token = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refresh_token = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const hashedRefreshToken = await bcrypt.hash(refresh_token, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: hashedRefreshToken },
+    });
+
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000,
+    });
+    res.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return {
+      statusCode: 200,
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+      },
+    };
   }
 
   async login(user: any) {
@@ -41,11 +70,25 @@ export class AuthService {
     };
   }
 
-  async logoutAndClearCookie(res: ExpressResponse) {
+  async logoutAndClearCookie(userId: string, res: ExpressResponse) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null },
+    });
+
     res.clearCookie('access_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'strict',
     });
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      // secure: process.env.NODE_ENV === 'production',
+      secure: false,
+      sameSite: 'strict',
+    });
+
+    return { statusCode: 200, message: 'Logout successful' };
   }
 }
